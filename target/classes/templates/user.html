@@ -1,0 +1,24 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org" lang="ru">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title th:text="${param.get('id')}">Title</title>
+</head>
+<body>
+    <tr th:unless="${customUser}">
+        <td colspan="2" th:text="'User with ID '+${param.get('id')}+' does not exist.'"> User with ID "n" does not exist </td>
+    </tr>
+    <tr th:if="${customUser}">
+        <b>ID:</b> <td><span th:text="${customUser.getId()}"> ID </span></td><br>
+        <b>Telegram ID:</b> <td><span th:text="${customUser.getChatId()}"> Telegram ID </span></td><br>
+        <b>Name:</b> <td><span th:text="${customUser.getName()}"> Name </span></td><br><br>
+        <b>Messages</b><hr>
+        <td th:each="customMessage: ${customUser.getCustomMessages()}">
+            <b th:if="${customMessage.getBotMessage()}">Bot: </b>
+            <b th:unless="${customMessage.getBotMessage()}"
+               th:text="${customUser.getName()}+': '">User: </b>
+            <br><span th:text="'&nbsp;&nbsp;&nbsp;'+${customMessage.getMessage()}"></span><br>
+        </td>
+    </tr>
+</body>
+</html>

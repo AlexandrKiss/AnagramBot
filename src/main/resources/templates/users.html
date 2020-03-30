@@ -1,0 +1,18 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org" lang="ru">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>Users List</title>
+</head>
+<body>
+    <tr th:if="${users.empty}">
+        <td colspan="2"> No users </td>
+    </tr>
+    <tr th:unless="${users.empty}">
+        <b>Список пользователей:</b><br>
+        <td th:each="user: ${users}">
+            <a th:text="${user.getName()}" th:href="@{/(id=${user.getChatId()})}"> Name </a><br>
+        </td>
+    </tr>
+</body>
+</html>

@@ -1,14 +1,16 @@
 package ua.kiev.prog;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import ua.kiev.prog.models.CustomUser;
+
+import java.util.List;
 
 @Controller
 public class MyController {
-    private static final Logger logger = LoggerFactory.getLogger(MyController.class);
+//    private static final Logger logger = LoggerFactory.getLogger(MyController.class);
 
     private final UserService userService;
 
@@ -17,10 +19,20 @@ public class MyController {
     }
 
     @GetMapping("/")
-    public String greeting(Model model){
-        User user = userService.findByChatId(593845016);
-        logger.info(user.toString());
-        model.addAttribute("message",user.toString());
-        return "course";
+    public String greeting(@RequestParam(name="id", required=false) Long id, Model model){
+        if(id!=null) {
+            CustomUser customUser = userService.findByChatId(id);
+            model.addAttribute("customUser",customUser);
+            return "user";
+        } else {
+            List<CustomUser> users = userService.findAllUsers();
+            model.addAttribute("users",users);
+            return "users";
+        }
+    }
+
+    @GetMapping("/chat")
+    public String viewChat(){
+        return "chat";
     }
 }

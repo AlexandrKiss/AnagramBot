@@ -9,18 +9,22 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.ActionType;
 import org.telegram.telegrambots.meta.api.methods.send.SendChatAction;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.Contact;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import ua.kiev.prog.models.CustomMessage;
+import ua.kiev.prog.models.CustomUser;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.List;
 
 @Component
 @PropertySource("classpath:telegram.properties")
 public class ChatBot extends TelegramLongPollingBot {
-    private static final Logger logger = LoggerFactory.getLogger(ChatBot.class);
+
+    private static final Logger logger = LoggerFactory.getLogger(MyController.class);
 
     @Value("${bot.name}")
     private String botName;
@@ -46,57 +50,61 @@ public class ChatBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        if (!update.hasMessage() || !update.getMessage().hasText())
-            return;
-
-        String text = update.getMessage().getText();;
+        final String text = update.getMessage().getText();
         final long chatId = update.getMessage().getChatId();
         final String userName = update.getMessage().getFrom().getUserName();
-
-        if(text.equals("/start")) {
-            sendMessage(chatId, "Я бот для решения анограмм на русском языке. " +
-                    "Напиши мне анаграмму и я попробую ее разгадать \uD83D\uDE09. Например: <pre>банка</pre>");
-            return;
+        if(update.getMessage().hasContact()) {
+            Contact contact = update.getMessage().getContact();
+            logger.info(contact.toString());
         }
 
-        User user = userService.findByChatId(chatId);
-
-        if (user == null) {
-            if(userName==null) {
-                user = new User(chatId);
-                sendMessage(chatId,"Привет \uD83D\uDC4B. Не узнаю тебя. Давай познакомимся. Как твое имя?");
-                user.setQestion(true);
-                user.setLastRequest(text);
-                userService.addUser(user);
-                return;
-            } else {
-                user = new User(chatId,userName);
-                sendMessage(chatId, "Привет \uD83D\uDC4B <b>"+user.getName()+"</b>. Рад с тобой познакомиться \uD83D\uDE0A.");
-                userService.addUser(user);
-            }
-        } else {
-            if(user.getQestion()){
-                user.setName(text);
-                user.setQestion(false);
-                sendMessage(chatId, "<b>"+user.getName()+"</b> - шикарное имя \uD83D\uDC4C. Рад с тобой познакомиться \uD83D\uDE0A.");
-                userService.addUser(user);
-                text = user.getLastRequest();
-            }
+        CustomUser user = userService.findByChatId(chatId);
+        if(acquaintance(user, chatId, userName, text)) {
+            return; //знакомство с новым User
         }
 
-        logger.info(user.toString());
-
-        logger.info(userName+"("+chatId+"): "+text);
         try {
-            sendMessage(chatId, anag(text, words()));
-            user.setCountRequest(user.getCountRequest()+1);
-            userService.addUser(user);
+            userService.addMessage(new CustomMessage(user, text, false)); //сохраняем сообщение User
+            sendMessage(user, anagram(text, words()),false);//отправляем сообщение бота
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    private String anag(String string, List<String>words){
+    private boolean acquaintance(CustomUser user, long chatId, String userName, String text){
+        String startText = "Я бот для решения анаграмм на русском языке. " +
+                "Напиши мне анаграмму и я попробую ее разгадать \uD83D\uDE09. Например: <pre>банка</pre>";
+        if (user == null) {
+            if(userName==null) {
+                user = new CustomUser(chatId);
+                user.setQestion(true);
+                userService.addUser(user);
+                sendMessage(user,
+                        "Привет \uD83D\uDC4B. Не узнаю тебя. Давай познакомимся. Как твое имя?",true);
+            } else {
+                user = new CustomUser(chatId,userName);
+                userService.addUser(user);
+                sendMessage(user,
+                        "Привет \uD83D\uDC4B <b>"+user.getName()+"</b>. Рад с тобой познакомиться \uD83D\uDE0A.",false);
+                sendMessage(user, startText,false);
+            }
+            return true;
+        } else {
+            if(user.getQestion()){
+                user.setName(text);
+                user.setQestion(false);
+                userService.updateUser(user);
+                userService.addMessage(new CustomMessage(user, text, false));
+                sendMessage(user,
+                        "<b>"+user.getName()+"</b> - шикарное имя \uD83D\uDC4C. Рад с тобой познакомиться \uD83D\uDE0A.", false);
+                sendMessage(user, startText, false);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String anagram(String string, List<String>words){
         StringBuilder stringBuilder = new StringBuilder();
         int count = 0;
         boolean eq = false;
@@ -137,12 +145,15 @@ public class ChatBot extends TelegramLongPollingBot {
         }
     }
 
-    private void sendMessage(long chatId, String text) {
+    private void sendMessage(CustomUser user, String text, boolean requestContact) {
+        CustomMessage customMessage = new CustomMessage(user, text, true);
+        userService.addMessage(customMessage);
+
         SendChatAction sendChatAction = new SendChatAction()
-                .setChatId(chatId)
+                .setChatId(user.getChatId())
                 .setAction(ActionType.get("typing"));
         SendMessage message = new SendMessage()
-                .setChatId(chatId)
+                .setChatId(user.getChatId())
                 .setText(text)
                 .setParseMode("html");
         try {
